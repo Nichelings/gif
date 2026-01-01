@@ -18,7 +18,7 @@
             --card-border: rgba(255, 255, 255, 0.1);
             --danger: #e74c3c;
             --warning: #f39c12;
-            --nav-height: 80px; /* Variable for JS padding calculations if needed */
+            --nav-height: 80px;
         }
 
         body { 
@@ -26,7 +26,7 @@
             background: linear-gradient(135deg, #0f0c29, #24243e);
             min-height: 100vh;
             margin: 0;
-            padding-top: 100px; /* Default desktop padding */
+            padding-top: 100px;
         }
 
         /* Fixed Navigation */
@@ -38,7 +38,7 @@
             backdrop-filter: blur(15px);
             border-bottom: 1px solid var(--card-border);
             padding: 0 1rem;
-            min-height: 80px; /* Changed from height to min-height */
+            min-height: 80px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -207,13 +207,12 @@
         /* ----- MOBILE OPTIMIZATIONS ----- */
         @media (max-width: 768px) {
             body {
-                /* Increase top padding so gallery isn't hidden behind the taller mobile nav */
                 padding-top: 180px; 
             }
 
             nav {
                 flex-direction: column;
-                height: auto; /* Allow nav to grow */
+                height: auto;
                 padding: 15px;
                 gap: 15px;
             }
@@ -224,26 +223,22 @@
                 flex-wrap: wrap;
             }
 
-            /* Make the search input take a full row */
             #searchInput {
                 width: 100%;
-                order: 10; /* Force to bottom of its flex container */
+                order: 10;
                 margin-top: 5px;
             }
 
-            /* Target the second UL (Controls) to rearrange items */
             nav ul:nth-child(2) {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 10px;
             }
 
-            /* Adjust list items in the second UL to fit nicely */
             nav ul:nth-child(2) li {
                 flex-grow: 1;
             }
             
-            /* Make the search container take full width */
             nav ul:nth-child(2) li:nth-child(2) {
                 width: 100%;
                 flex-grow: 100;
@@ -267,7 +262,7 @@
         <ul>
             <li>
                 <label class="nsft-toggle-label" title="Hide content Not Safe For Tello">
-                    <input type="checkbox" id="nsftToggle" onchange="applyFilters()"> 
+                    <input type="checkbox" id="nsftToggle" onchange="applyFilters()" checked> 
                     Hide NSFT
                 </label>
             </li>
@@ -340,7 +335,11 @@
             const savedSafe = localStorage.getItem('niche_safe_mode');
 
             if(savedSort) document.getElementById('sortSelect').value = savedSort;
-            if(savedSafe !== null) document.getElementById('nsftToggle').checked = (savedSafe === 'true');
+            
+            // Only override the HTML default if a preference exists in localStorage
+            if(savedSafe !== null) {
+                document.getElementById('nsftToggle').checked = (savedSafe === 'true');
+            }
         }
 
         async function fetchGifs() {
