@@ -72,29 +72,35 @@
         
         .nsft-toggle-label input { margin: 0; transform: scale(1.1); }
 
-        /* Masonry Layout */
+        /* --- LAYOUT CHANGED TO GRID (Horizontal Rows) --- */
         #gallery {
-            column-count: 1;
-            column-gap: 20px;
+            display: grid;
+            /* Creates responsive columns that fill rows left-to-right */
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
             padding: 20px;
             max-width: 1400px;
             margin: 0 auto;
         }
-
-        @media (min-width: 600px) { #gallery { column-count: 2; } }
-        @media (min-width: 900px) { #gallery { column-count: 3; } }
-        @media (min-width: 1200px) { #gallery { column-count: 4; } }
+        
+        /* Mobile adjust for grid */
+        @media (max-width: 600px) {
+            #gallery {
+                grid-template-columns: 1fr; /* Single column on mobile */
+            }
+        }
 
         /* Card Styling */
         .card { 
-            break-inside: avoid;
-            margin-bottom: 20px;
+            margin-bottom: 0; /* Margin handled by grid gap */
             border-radius: 16px; 
             background: var(--surface); 
             border: 1px solid var(--card-border);
             overflow: hidden;
             transition: all 0.3s ease;
             position: relative;
+            display: flex;
+            flex-direction: column;
         }
 
         .card:hover {
@@ -113,14 +119,20 @@
         }
 
         .card-media {
-            width: 100%; display: block; height: auto;
-            background: #000; cursor: zoom-in;
+            width: 100%; 
+            height: 250px; /* Fixed height for neat rows, or remove for variable */
+            object-fit: cover; /* Ensures images fill the square nicely */
+            background: #000; 
+            cursor: zoom-in;
+            display: block;
         }
 
         .card-footer { 
             padding: 12px;
             background: rgba(0,0,0,0.3);
             display: flex; flex-direction: column; gap: 10px;
+            flex-grow: 1; /* Pushes footer to bottom */
+            justify-content: space-between;
         }
 
         .tag-container { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -156,7 +168,6 @@
         .btn-like { background: rgba(255, 0, 204, 0.15); color: var(--secondary); border: 1px solid rgba(255, 0, 204, 0.3); }
         .btn-like:hover { background: rgba(255, 0, 204, 0.3); }
         
-        /* Liked State */
         .btn-like.liked { background: var(--secondary); color: white; opacity: 0.8; cursor: default; }
         .btn-like:disabled { cursor: not-allowed; }
 
@@ -204,45 +215,15 @@
         @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
         @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
 
-        /* ----- MOBILE OPTIMIZATIONS ----- */
+        /* Mobile Nav */
         @media (max-width: 768px) {
-            body {
-                padding-top: 180px; 
-            }
-
-            nav {
-                flex-direction: column;
-                height: auto;
-                padding: 15px;
-                gap: 15px;
-            }
-
-            nav ul {
-                width: 100%;
-                justify-content: space-between;
-                flex-wrap: wrap;
-            }
-
-            #searchInput {
-                width: 100%;
-                order: 10;
-                margin-top: 5px;
-            }
-
-            nav ul:nth-child(2) {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-
-            nav ul:nth-child(2) li {
-                flex-grow: 1;
-            }
-            
-            nav ul:nth-child(2) li:nth-child(2) {
-                width: 100%;
-                flex-grow: 100;
-            }
+            body { padding-top: 180px; }
+            nav { flex-direction: column; height: auto; padding: 15px; gap: 15px; }
+            nav ul { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+            #searchInput { width: 100%; order: 10; margin-top: 5px; }
+            nav ul:nth-child(2) { display: flex; flex-wrap: wrap; gap: 10px; }
+            nav ul:nth-child(2) li { flex-grow: 1; }
+            nav ul:nth-child(2) li:nth-child(2) { width: 100%; flex-grow: 100; }
         }
     </style>
 </head>
@@ -311,6 +292,9 @@
                 <label for="editTagInput">Tags</label>
                 <input type="text" id="editTagInput" placeholder="Tags (separated by commas)" required>
                 
+                <label for="editDateInput">Date Added</label>
+                <input type="date" id="editDateInput" required>
+
                 <label class="checkbox-wrapper">
                     <input type="checkbox" id="editNsftInput">
                     <span style="color: var(--danger); font-weight: bold;">Mark as NSFT</span>
@@ -335,8 +319,6 @@
             const savedSafe = localStorage.getItem('niche_safe_mode');
 
             if(savedSort) document.getElementById('sortSelect').value = savedSort;
-            
-            // Only override the HTML default if a preference exists in localStorage
             if(savedSafe !== null) {
                 document.getElementById('nsftToggle').checked = (savedSafe === 'true');
             }
@@ -380,6 +362,7 @@
             if (sortMode === 'popular') {
                 filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0));
             } else {
+                // Sort by Date (uses created_at)
                 filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             }
 
@@ -402,6 +385,7 @@
                 const isVideo = url.includes('.mp4') || url.includes('.webm');
                 const tagsArray = (gif.tags || 'niche').split(',').map(t => t.trim());
                 
+                // Format Date for Display
                 const dateObj = new Date(gif.created_at);
                 const dateStr = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
                 
@@ -419,6 +403,7 @@
                 
                 const badgeHtml = isNsft ? `<div class="nsft-badge">NSFT</div>` : '';
                 
+                // Object-fit added to CSS to handle fixed grid rows nicely
                 let mediaHtml = isVideo 
                     ? `<video src="${url}" class="card-media" autoplay loop muted playsinline></video>`
                     : `<img src="${url}" class="card-media" loading="lazy" onerror="this.src='https://placehold.co/400x300?text=Broken+Link'">`;
@@ -485,6 +470,14 @@
             document.getElementById('editIdInput').value = id;
             document.getElementById('editTagInput').value = gif.tags || '';
             document.getElementById('editNsftInput').checked = gif.is_nsft === true;
+
+            // --- DATE HANDLING ---
+            // Convert Timestamp to YYYY-MM-DD for input
+            if(gif.created_at) {
+                const dateVal = new Date(gif.created_at).toISOString().split('T')[0];
+                document.getElementById('editDateInput').value = dateVal;
+            }
+
             document.getElementById('editModal').showModal();
         }
 
@@ -493,13 +486,20 @@
             const id = document.getElementById('editIdInput').value;
             const newTags = document.getElementById('editTagInput').value;
             const newNsft = document.getElementById('editNsftInput').checked;
+            
+            // --- NEW DATE HANDLING ---
+            const dateInput = document.getElementById('editDateInput').value;
+            // Create a new ISO string from the input (defaults to midnight UTC for that date)
+            const newDateISO = new Date(dateInput).toISOString();
 
+            // Optimistic Update
             const index = cachedGifs.findIndex(g => g.id == id);
             if(index !== -1) {
                 cachedGifs[index].tags = newTags;
                 cachedGifs[index].is_nsft = newNsft;
+                cachedGifs[index].created_at = newDateISO;
             }
-            applyFilters(); 
+            applyFilters(); // Re-render and Re-sort
 
             document.getElementById('editModal').close();
 
@@ -507,13 +507,14 @@
                 .from('gifs')
                 .update({ 
                     tags: newTags, 
-                    is_nsft: newNsft 
+                    is_nsft: newNsft,
+                    created_at: newDateISO
                 })
                 .eq('id', id);
 
             if (error) {
                 alert('Error updating: ' + error.message);
-                fetchGifs(); 
+                fetchGifs(); // Revert on error
             } else {
                 showToast("Updated!");
             }
