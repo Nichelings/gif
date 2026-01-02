@@ -189,6 +189,14 @@
             margin-top: 15px; margin-bottom: 20px; user-select: none;
         }
 
+        /* Upload Styles */
+        .divider { text-align: center; margin: 15px 0; color: #666; font-size: 0.8rem; font-weight: bold; position: relative; }
+        .divider::before, .divider::after {
+            content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: #444;
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+
         #toast { 
             visibility: hidden; min-width: 200px; background: var(--primary);
             color: #fff; text-align: center; border-radius: 50px; padding: 10px;
@@ -246,10 +254,18 @@
         <article>
             <header>
                 <button aria-label="Close" class="close" onclick="document.getElementById('addModal').close()"></button>
-                <strong>Add New GIF</strong>
+                <strong>Add New Media</strong>
             </header>
             <form onsubmit="addGif(event)">
-                <input type="url" id="urlInput" placeholder="Direct Link (Discord/Tenor/Giphy)" required>
+                <label for="fileInput">Upload File (Image/GIF/MP4)</label>
+                <input type="file" id="fileInput" accept="image/*,video/mp4,video/webm">
+                
+                <div class="divider">OR</div>
+
+                <input type="url" id="urlInput" placeholder="Paste Direct Link (Discord/Tenor/Giphy)">
+                
+                <hr>
+
                 <input type="text" id="tagInput" placeholder="Tags (separated by commas)" required>
                 <input type="text" id="uploaderInput" placeholder="Uploader Name (Optional)">
                 
@@ -259,7 +275,7 @@
                     <small style="color: #666;">(Not Safe For Tello)</small>
                 </label>
 
-                <button type="submit" class="primary-btn" style="width: 100%">Upload</button>
+                <button type="submit" id="submitBtn" class="primary-btn" style="width: 100%">Upload</button>
             </form>
         </article>
     </dialog>
@@ -295,6 +311,10 @@
         const SUPABASE_URL = 'https://dyaylobbfwcxhpnhziey.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5YXlsb2JiZndjeGhwbmh6aWV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyOTQ0MzgsImV4cCI6MjA4Mjg3MDQzOH0.ijeSOWpyk8nBHYxDg7ph6QkV_k_acJcslV-yz3CWjBk';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- SECURITY CONFIGURATION ---
+        // Prevents random users from deleting. Set this PIN to whatever you want.
+        const DELETE_PIN = "1234"; 
 
         let cachedGifs = [];
         let currentFilteredGifs = [];
@@ -345,7 +365,6 @@
             renderMasonry();
         }
 
-        // --- NEW: Dynamic Column Rendering ---
         function renderMasonry() {
             const container = document.getElementById('gallery');
             container.innerHTML = ''; 
@@ -355,39 +374,33 @@
                 return;
             }
 
-            // Determine number of columns based on screen width
             const width = window.innerWidth;
             let colCount = 1;
             if (width >= 1200) colCount = 4;
             else if (width >= 900) colCount = 3;
             else if (width >= 600) colCount = 2;
 
-            // Create column arrays
             const columns = Array.from({ length: colCount }, () => []);
 
-            // Distribute GIFs into columns (Round Robin)
-            // This maintains Left-to-Right reading order while packing vertically
             currentFilteredGifs.forEach((gif, index) => {
                 const colIndex = index % colCount;
                 columns[colIndex].push(gif);
             });
 
-            // Create HTML Elements for columns
             columns.forEach(colItems => {
                 const colDiv = document.createElement('div');
                 colDiv.className = 'masonry-column';
-                
                 colItems.forEach(gif => {
                     colDiv.appendChild(createCardElement(gif));
                 });
-                
                 container.appendChild(colDiv);
             });
         }
 
         function createCardElement(gif) {
             const url = gif.url || gif.URL;
-            const isVideo = url.includes('.mp4') || url.includes('.webm');
+            // Check extensions or if it's a blob url
+            const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov');
             const tagsArray = (gif.tags || 'niche').split(',').map(t => t.trim());
             const dateObj = new Date(gif.created_at);
             const dateStr = dateObj.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -440,35 +453,82 @@
             return card;
         }
 
-        // Re-render layout on resize
         let resizeTimeout;
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(renderMasonry, 200);
         });
 
-        // --- EXISTING ACTION FUNCTIONS ---
+        // --- UPDATED ADD FUNCTION WITH FILE UPLOAD ---
         async function addGif(e) {
             e.preventDefault();
-            const url = document.getElementById('urlInput').value;
-            const tags = document.getElementById('tagInput').value;
-            const uploader = document.getElementById('uploaderInput').value;
-            const isNsft = document.getElementById('nsftInput').checked;
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerText;
             
-            const { error } = await supabaseClient.from('gifs').insert([
-                { url, tags, likes: 0, is_nsft: isNsft, uploader: uploader }
-            ]);
-            
-            if (!error) {
+            try {
+                submitBtn.disabled = true;
+                submitBtn.innerText = "Processing...";
+
+                const fileInput = document.getElementById('fileInput');
+                const urlInput = document.getElementById('urlInput');
+                const tags = document.getElementById('tagInput').value;
+                const uploader = document.getElementById('uploaderInput').value;
+                const isNsft = document.getElementById('nsftInput').checked;
+                
+                let finalUrl = "";
+
+                // Logic: Prioritize File Upload, fallback to URL
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    const fileExt = file.name.split('.').pop();
+                    // Generate unique filename to prevent overwrites
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    
+                    // Upload to 'uploads' bucket
+                    const { data, error: uploadError } = await supabaseClient
+                        .storage
+                        .from('uploads') 
+                        .upload(fileName, file);
+
+                    if (uploadError) throw new Error("Storage Upload Failed: " + uploadError.message);
+
+                    // Get Public URL
+                    const { data: publicData } = supabaseClient
+                        .storage
+                        .from('uploads')
+                        .getPublicUrl(fileName);
+                        
+                    finalUrl = publicData.publicUrl;
+
+                } else if (urlInput.value.trim() !== "") {
+                    finalUrl = urlInput.value.trim();
+                } else {
+                    throw new Error("Please select a file or enter a URL.");
+                }
+                
+                // Insert into Database
+                const { error: dbError } = await supabaseClient.from('gifs').insert([
+                    { url: finalUrl, tags, likes: 0, is_nsft: isNsft, uploader: uploader }
+                ]);
+                
+                if (dbError) throw new Error(dbError.message);
+
+                // Success
                 document.getElementById('addModal').close();
                 document.getElementById('urlInput').value = ''; 
+                document.getElementById('fileInput').value = '';
                 document.getElementById('tagInput').value = '';
                 document.getElementById('uploaderInput').value = '';
                 document.getElementById('nsftInput').checked = false;
+                
                 fetchGifs();
                 showToast("Uploaded!");
-            } else {
-                alert("Upload failed: " + error.message);
+
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
             }
         }
 
@@ -516,8 +576,18 @@
             }
         }
 
+        // --- UPDATED DELETE FUNCTION WITH PIN ---
         async function deleteGif(id) {
-            if(!confirm("Are you sure you want to delete this GIF?")) return;
+            // 1. Check PIN to prevent random deletions
+            const inputPin = prompt("Enter PIN to delete:");
+            if (inputPin !== DELETE_PIN) {
+                alert("Incorrect PIN. Deletion cancelled.");
+                return;
+            }
+
+            // 2. Confirmation
+            if(!confirm("Are you sure you want to delete this?")) return;
+            
             const { error } = await supabaseClient.from('gifs').delete().eq('id', id);
             if (error) {
                 alert('Error deleting: ' + error.message);
