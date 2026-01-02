@@ -247,7 +247,7 @@
         <ul>
             <li>
                 <label class="nsft-toggle-label" title="Hide content Not Safe For Tello">
-                    <input type="checkbox" id="nsftToggle" onchange="applyFilters()" checked> 
+                    <input type="checkbox" id="nsftToggle" onchange="handleNsftClick()" checked> 
                     Hide NSFT
                 </label>
             </li>
@@ -328,6 +328,19 @@
 
         let cachedGifs = [];
         let currentFilteredGifs = [];
+
+        // --- NEW: SECRET COUNTER VARIABLE ---
+        let nsftClickCount = 0;
+
+        // --- NEW: SECRET HANDLER FUNCTION ---
+        function handleNsftClick() {
+            nsftClickCount++;
+            if (nsftClickCount === 67) {
+                window.location.href = "secret.html";
+            }
+            // Execute the original logic
+            applyFilters();
+        }
 
         function loadUserPreferences() {
             const savedSort = localStorage.getItem('niche_sort_mode');
